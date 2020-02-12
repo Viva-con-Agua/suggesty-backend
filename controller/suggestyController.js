@@ -80,31 +80,3 @@ exports.deleteArtist = (req, res) => {
     }
   });
 };
-
-// @desc get poolevent by id
-// @route GET /api/v1/poolevent/:id
-// @access Public
-exports.getFavoritePooleventsByUserId = (req, res) => {
-
-  var userId = req.params.id;
-  global.conn.query(
-    `SELECT action.vcaId, action.vcaType
-    FROM vcaartist AS user
-    JOIN vcaartist AS action
-    ON action.artistId = user.artistId
-    where user.vcaId='${userId}' and user.vcaType="USER" and action.vcaType="ACTION";`,
-    (error, resp) => {
-      if (error) {
-        res.status(400).json({
-          success: false,
-          message: `Error in putPoolEvent: ${error.message}`
-        });
-      } else {
-        res.status(200).json({
-          success: true,
-          data: resp
-        });
-      }
-    }
-  );
-};

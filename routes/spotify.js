@@ -6,7 +6,8 @@ const {
   getArtistByName,
   getArtistById,
   getSimilarArtistById,
-  getArtistByVcaId
+  getArtistByVcaId,
+  getFavoritePooleventsByUserId
 } = require("../controller/spotifyController");
 
 
@@ -21,6 +22,9 @@ router.route("/similar/id/:artistId")
 
 router.route("/artist/:vcaIdType/:vcaId")
   .get(getArtistByVcaId)
+
+router.route("/suggestion/user/:id")
+  .get(getFavoritePooleventsByUserId)
 
 
 

@@ -12,6 +12,7 @@ const {
 } = require("../controller/suggestyController");
 
 
+
 router.route("/:vcaIdType/:vcaId")
   .get(getArtistByVcaId)
 
@@ -20,8 +21,7 @@ router.route("/")
   .post(postArtist)
   .delete(deleteArtist)
 
-router.route("/suggestyActions/:id")
-  .get(getFavoritePooleventsByUserId)
+
 
 
 
