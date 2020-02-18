@@ -4,8 +4,6 @@ const { verify } = require("../middelware/tokenChecker");
 
 const {
   getArtistByVcaId,
-  postArtist,
-  deleteArtist,
   getFavoritePooleventsByUserId
 
 
@@ -17,9 +15,7 @@ router.route("/:vcaIdType/:vcaId")
   .get(getArtistByVcaId)
 
 
-router.route("/")
-  .post(postArtist)
-  .delete(deleteArtist)
+
 
 
 
