@@ -1,5 +1,6 @@
 const { connectMysql } = require("./config/connectMysql");
 const { connectSpotify } = require("./config/connectSpotify");
+const { createJobQueue } = require("./config/createJobQueue");
 const eventEmitter = require("./service/eventEmitter");
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
@@ -30,6 +31,7 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 connectMysql();
 connectSpotify();
+createJobQueue();
 app.use(cors());
 
 
