@@ -6,7 +6,6 @@ const Axios = require("axios");
 var placeholderImage = 'https://upload.wikimedia.org/wikipedia/en/e/ee/Unknown-person.gif';
 
 
-
 // @desc get poolevent by id
 // @route GET /api/v1/:id
 // @access Public
@@ -24,7 +23,7 @@ exports.getArtistByName = async (req, res) => {
 
   const ress = await runSpotifyRequestNewLoop(method, uri, qry);
 
-  if(ress.success){
+  if (ress.success) {
 
     var resultArtist = [];
 
@@ -71,31 +70,32 @@ exports.getArtistById = async (req, res) => {
 
   const ress = await runSpotifyRequestNewLoop(method, uri, qry);
 
-    if(!ress.success){
-      res.status(400).json({
-        success: false,
-        message: `Error getArtistByName: ${ress.data}`
-      });
-      throw new Error(ress.data)
-    };
-
-
-    var artist = ress.body;
-    var newArtist = {
-      "artistName": artist.name,
-      "artistId": artist.id
-    };
-
-    if (typeof artist.images[0] !== 'undefined' && artist.images[0] !== null) {
-      newArtist.artistImage = artist.images[0].url;
-    } else {
-      newArtist.artistImage = placeholderImage;
-    }
-
-    res.status(200).json({
-      success: true,
-      data: newArtist
+  if (!ress.success) {
+    res.status(400).json({
+      success: false,
+      message: `Error getArtistByName: ${ress.data}`
     });
+    throw new Error(ress.data)
+  }
+  ;
+
+
+  var artist = ress.body;
+  var newArtist = {
+    "artistName": artist.name,
+    "artistId": artist.id
+  };
+
+  if (typeof artist.images[0] !== 'undefined' && artist.images[0] !== null) {
+    newArtist.artistImage = artist.images[0].url;
+  } else {
+    newArtist.artistImage = placeholderImage;
+  }
+
+  res.status(200).json({
+    success: true,
+    data: newArtist
+  });
 
 
   //});
@@ -114,7 +114,7 @@ exports.getSimilarArtistById = async (req, res) => {
   var method = "GET";
   var qry = {};
   var uri = "https://api.spotify.com/v1/artists/" + artistId + "/related-artists";
-  const resultFetchSimilarArtists = await runSpotifyRequestNewLoop(method,uri,qry);
+  const resultFetchSimilarArtists = await runSpotifyRequestNewLoop(method, uri, qry);
 
 
   if (resultFetchSimilarArtists.success == false) {
@@ -156,12 +156,11 @@ exports.getSimilarArtistById = async (req, res) => {
 // @access Public
 exports.getArtistByVcaId = async (req, res) => {
 
-
   var vcaId = req.params.vcaId;
   var vcaIdType = req.params.vcaIdType;
 
   global.conn.query(
-    `SELECT * FROM vcaartist p WHERE vcaId='${vcaId}' AND vcaType='${vcaIdType}';`,
+    `SELECT * FROM vcaartistheuristic p WHERE vcaId='${vcaId}' AND vcaType='${vcaIdType}' and recursionDepth=0;`,
     async (error, resp) => {
       if (error) {
         res.status(400).json({
@@ -187,7 +186,7 @@ exports.getArtistByVcaId = async (req, res) => {
           var qry = {};
           const ress = await runSpotifyRequestNewLoop(method, uri, qry);
 
-          if(!ress.success){
+          if (!ress.success) {
             res.status(400).json({
               success: false,
               message: `Error getArtistByName: ${ress.error}`
@@ -247,13 +246,13 @@ exports.getFavoritePooleventsByUserId = async (req, res) => {
       var uri = "https://api.spotify.com/v1/artists?ids=" + artistId;
       var method = "GET";
       var qry = {};
-      const artistPoolEventResult = await runSpotifyRequestNewLoop(method,uri,qry);
+      const artistPoolEventResult = await runSpotifyRequestNewLoop(method, uri, qry);
       var artistPoolEventName = artistPoolEventResult.data.artists[0].name;
 
       var uri2 = "https://api.spotify.com/v1/artists?ids=" + heuristicArtistId;
       var method2 = "GET";
       var qry2 = {};
-      const artistHeuristicResult = await runSpotifyRequestNewLoop(method2,uri2,qry2);
+      const artistHeuristicResult = await runSpotifyRequestNewLoop(method2, uri2, qry2);
       var artistHeuristicName = artistHeuristicResult.data.artists[0].name;
 
       var artist = {
@@ -288,49 +287,99 @@ exports.postArtist = async (req, res) => {
   var artistId = req.body.artistId;
   var vcaType = req.body.vcaType;
 
+
+  var newHeuristic2 = [];
+  newHeuristic2.push([vcaId, artistId, vcaType, artistId, 0]);
+  const resAddArtistRec0 = await addHeuristicArtist(newHeuristic2);
+
+  res.status(200).json({
+    success: true,
+    data: []
+  });
+
+
+
+  // RECURSION DEPTH 0
+  var method = "GET";
+  var qry = {};
+  var uri = "https://api.spotify.com/v1/artists/" + artistId + "/related-artists";
+  const resSimilarArtistsRec0 = await runSpotifyRequestNewLoop(method, uri, qry);
+
+  // RECURSION DEPTH 1
+  var promises = [];
+  for(var i = 0; i < resSimilarArtistsRec0.data.artists.length; i++){
+    var art = resSimilarArtistsRec0.data.artists[i];
+    var method = "GET";
+    var qry = {};
+    var uri = "https://api.spotify.com/v1/artists/" + art.id + "/related-artists";
+    var promise = runSpotifyRequestNewLoop(method, uri, qry);
+    promises.push(promise);
+  }
+  var resSimilarArtistsRec1 = await Promise.all(promises);
+  console.log(resSimilarArtistsRec1.length);
+
+  // RECURSION DEPTH 2
+  var promises2 = [];
+  for(var i = 0; i < resSimilarArtistsRec1.length; i++){
+    for (var j = 0; j < resSimilarArtistsRec1[i].data.artists.length; j++){
+      var art = resSimilarArtistsRec1[i].data.artists[j];
+      var method = "GET";
+      var qry = {};
+      var uri = "https://api.spotify.com/v1/artists/" + art.id + "/related-artists";
+      var promise = runSpotifyRequestNewLoop(method, uri, qry);
+      promises2.push(promise);
+    }
+  }
+  var resSimilarArtistsRec2 = await Promise.all(promises2);
+  console.log(resSimilarArtistsRec2.length);
+
+
   var insertArray = [];
-  insertArray.push(vcaId);
-  insertArray.push(artistId);
-  insertArray.push(vcaType);
 
-  const resultAddArtist = await addArtist(insertArray);
 
-  if (resultAddArtist.success == false) {
-    res.status(400).json({
-      success: false,
-      data: resultAddArtist.data
-    });
+  // INSERT ARTISTS WITH REC1
+  for(var i = 0; i < resSimilarArtistsRec0.data.artists.length; i++) {
+    var art = resSimilarArtistsRec0.data.artists[i];
+    insertArray.push([vcaId, art.id, vcaType, artistId, 1]);
+  }
+
+  // INSERT ARTISTS WITH REC2
+  for(var i = 0; i < resSimilarArtistsRec1.length; i++) {
+    for (var j = 0; j < resSimilarArtistsRec1[i].data.artists.length; j++) {
+      var art2 = resSimilarArtistsRec1[i].data.artists[j];
+      insertArray.push([vcaId, art2.id, vcaType, artistId, 2]);
+    }
+  }
+
+
+  var artExists = await artistExists(vcaId, artistId, vcaType, artistId, 0)
+  console.log(artExists);
+  if(artExists){
+    const resAddArtistRec12 = await addHeuristicArtist(insertArray);
   } else {
+    console.log("Zwischendurch gelöscht");
+  }
 
+ // console.log(insertArray);
+
+
+ //const resultAddHeuristicArtist = await addHeuristicArtist(insertArray);
+
+  /*
+  var promises2 = [];
+  for(var i = 0; i < resArray.length; i++){
     var method = "GET";
     var qry = {};
     var uri = "https://api.spotify.com/v1/artists/" + artistId + "/related-artists";
-    const resultFetchSimilarArtists = await runSpotifyRequestNewLoop(method,uri,qry);
 
-    var resultArtist = [];
-
-    for (var x = 0; x < resultFetchSimilarArtists.data.artists.length; x++) {
-      var artist = resultFetchSimilarArtists.data.artists[x];
-
-      var newArtist = {
-        "artistName": artist.name,
-        "artistId": artist.id
-      };
-
-      if (typeof artist.images[0] !== 'undefined' && artist.images[0] !== null) {
-        newArtist.artistImage = artist.images[0].url;
-      } else {
-        newArtist.artistImage = placeholderImage;
-      }
-      resultArtist.push(newArtist);
-    }
-
-    res.status(200).json({
-      success: true,
-      data: resultArtist
-    });
+    var promise = runSpotifyRequestNewLoop(method, uri, qry);
+    promises2.push(promise);
+  }
+*/
 
 
+
+  if (false) {
     var insertHeuristicArray = [];
 
 
@@ -339,16 +388,15 @@ exports.postArtist = async (req, res) => {
     var recursionDepth = 0;
     newHeuristic.push([vcaId, artistId, vcaType, artistId, recursionDepth]);
 
-    for (var x = 0; x < resultFetchSimilarArtists.data.artists.length; x++) {
-      newHeuristic.push([vcaId, resultFetchSimilarArtists.data.artists[x].id, vcaType, artistId, 1]);
+    for (var x = 0; x < resSimilarArtistsRec0.data.artists.length; x++) {
+      newHeuristic.push([vcaId, resSimilarArtistsRec0.data.artists[x].id, vcaType, artistId, 1]);
     }
 
     const resultAddHeuristicArtist = await addHeuristicArtist(newHeuristic);
 
 
-
-    for (var x = 0; x < resultFetchSimilarArtists.data.artists.length; x++) {
-      var artist = resultFetchSimilarArtists.data.artists[x];
+    for (var x = 0; x < resSimilarArtistsRec0.data.artists.length; x++) {
+      var artist = resSimilarArtistsRec0.data.artists[x];
       var recursionDepth = 1;
 
       var input = {};
@@ -362,9 +410,9 @@ exports.postArtist = async (req, res) => {
 
         //console.log(result.success);
 
-        if(result.success){
+        if (result.success) {
 
-          for(var y = 0; y < result.data.length; y++){
+          for (var y = 0; y < result.data.length; y++) {
 
             var newInput = {};
             newInput.vcaId = result.data[y][0];
@@ -374,18 +422,16 @@ exports.postArtist = async (req, res) => {
             newInput.recursionDepth = 3;
 
 
-/*
-            global.jobQueue.push(newInput, function (err2, result2) {
-              console.log(result2.success);
-            });
-*/
+            /*
+                        global.jobQueue.push(newInput, function (err2, result2) {
+                          console.log(result2.success);
+                        });
+            */
 
 
           }
         }
       });
-
-
 
 
       /*
@@ -407,16 +453,13 @@ exports.postArtist = async (req, res) => {
       */
 
     }
-    /* MOVED TO QUEUE
-    const resultAddHeuristicArtist = await addHeuristicArtist(newHeuristic);
-    */
-
-
-
-
-    //console.log(resultAddHeuristicArtist.data);
-
   }
+  /* MOVED TO QUEUE
+  const resultAddHeuristicArtist = await addHeuristicArtist(newHeuristic);
+  */
+
+
+  //console.log(resultAddHeuristicArtist.data);
 
 
 };
@@ -429,7 +472,9 @@ exports.deleteArtist = async (req, res) => {
   var artistId = req.body.artistId;
   var vcaType = req.body.vcaType;
 
-  const resultRemoveArtist = await removeArtist(vcaId, artistId, vcaType);
+  const resultRemoveArtist = await removeHeuristicArtist(vcaId, artistId, vcaType);
+
+
 
   if (resultRemoveArtist.success == false) {
     res.status(400).json({
@@ -494,7 +539,7 @@ function fetchJoin(userId) {
   })
 }
 
-function addArtist(insertArray) {
+function addArtistTrash(insertArray) {
   return new Promise(resolve => {
     const sql = `INSERT INTO vcaartist (vcaId, artistId, vcaType) VALUES (?,?,?)`;
     global.conn.query(sql, insertArray, (error, favorite) => {
@@ -510,10 +555,25 @@ function addArtist(insertArray) {
   })
 }
 
+function artistExists(vcaId, artistId, vcaIdType, heuristicArtistId, recursionDepth) {
+  return new Promise(resolve => {
+    global.conn.query(
+      `SELECT COUNT(*) AS counter FROM vcaartistheuristic p WHERE vcaId='${vcaId}' AND artistId='${artistId}' AND vcaType='${vcaIdType}' and heuristicArtistId='${heuristicArtistId}' and recursionDepth='${recursionDepth}';`,
+      (error, resp) => {
+        console.log(resp[0].counter);
+        if(resp[0].counter>0){
+          resolve(true);
+        } else {
+          resolve(false)
+        }
+      });
+  })
+}
+
 function addHeuristicArtist(insertArray) {
   //console.log(insertArray.length);
   return new Promise(resolve => {
-    const sql = `INSERT INTO vcaartistheuristic (vcaId, artistId, vcaType, heuristicArtistId, recursionDepth) VALUES ?`;
+    const sql = `INSERT IGNORE INTO vcaartistheuristic (vcaId, artistId, vcaType, heuristicArtistId, recursionDepth) VALUES ?`;
     global.conn.query(sql, [insertArray], (error, favorite) => {
       if (error) {
         console.log(error.message);
@@ -615,13 +675,13 @@ function runSpotifyRequestNew(method, uri, qry) {
 
 
 // ADD RELATED ARTISTS TO DB
-exports.queueFunction = async (input,cb)=>{
+exports.queueFunction = async (input, cb) => {
 
   var newHeuristic = [];
 
   var vcaId = input.vcaId;
-  var vcaArtistId =  input.artistId;
-  var vcaType =  input.vcaType;
+  var vcaArtistId = input.artistId;
+  var vcaType = input.vcaType;
   var heuristicArtistId = input.heuristicArtistId;
   var recursionDepth = input.recursionDepth;
 
@@ -629,8 +689,7 @@ exports.queueFunction = async (input,cb)=>{
   var method = "GET";
   var qry = {};
   var uri = "https://api.spotify.com/v1/artists/" + vcaArtistId + "/related-artists";
-  const resultFetchSimilarArtists2 = await runSpotifyRequestNewLoop(method,uri,qry);
-
+  const resultFetchSimilarArtists2 = await runSpotifyRequestNewLoop(method, uri, qry);
 
 
   for (var y = 0; y < resultFetchSimilarArtists2.data.artists.length; y++) {
@@ -645,7 +704,6 @@ exports.queueFunction = async (input,cb)=>{
   cb(null, result);
 
 }
-
 
 
 function sleep(millis) {
