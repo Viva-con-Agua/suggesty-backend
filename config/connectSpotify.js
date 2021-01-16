@@ -10,7 +10,10 @@ const connectSpotify = () => {
     "Authorization": "Basic " + process.env.SPOTIFY_AUTH
   });
 
+
   req.send("grant_type=client_credentials");
+
+
 
 
   req.end(function (res) {
